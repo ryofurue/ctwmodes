@@ -8,5 +8,6 @@
 # Examples (uncomment and modify as needed):
 !progs/ctwmodes.f90
 !progs/ctwmodes_pars.f90
-!utils/fortbin2nc.jl
 !utils/conf.jl
+!utils/fortbin2nc.jl
+!utils/plot-grid.jl
