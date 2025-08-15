@@ -1,0 +1,12 @@
+# Ignore everything by default
+*
+
+# But don't ignore .gitignore itself
+!.gitignore
+
+# Add specific files/directories you want to track below
+# Examples (uncomment and modify as needed):
+!progs/ctwmodes.f90
+!progs/ctwmodes_pars.f90
+!utils/fortbin2nc.jl
+!utils/conf.jl
