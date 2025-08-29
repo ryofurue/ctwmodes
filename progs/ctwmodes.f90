@@ -728,7 +728,7 @@ program main
   integer:: itmp ! temporary variable
   integer:: uni
 
-  write(*,*) "Ver 007: Eigenvalues will be c ."
+  write(*,*) "Ver 0.7.1: Eigenvalues will be c ."
 !  write(*,*) "rightboundary = "//trim(rightboundary)
   write(*,*) "f0 = ", f0
 

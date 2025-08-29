@@ -131,10 +131,18 @@ For internal use.
 Read a line and parse it.
 """
 function read_line_parse(is, typelist)
-  strlist = split(readline(is))
+  ll = readline(is)
+  strlist = split(ll)
+  if length(strlist) == 0
+    error("empty line")
+  elseif length(strlist) > length(typelist)
+    @say("Types are $(typelist) but there are more items on the line: $(ll)")
+  elseif length(strlist) < length(typelist)
+    error("Types are $(typelist) but there are fewer items on the line: $(ll)")
+  end
   res = map(x -> parse(x[1], x[2]), zip(typelist, strlist))
   if length(res) == 0
-    error("parse failed")
+    error("parse failed: $(ll)")
   elseif length(res) == 1
     return res[1]
   else
@@ -162,8 +170,18 @@ Helper function to interpolate the "function" (xs0[:],ys0[:])
 Outside the xs0[:] range, extrapolate assuming constant.
   If x is to the left  of the xs0 range, y = ys0[begin];
   If x is to the right of the xs0 range, y = ys0[end].
+
+The interpolator allows only for strictly increasing
+ x coordinates. If it's decreasing, reverse all vectors.
 """
 function interpolate_helper(;xs0,ys0,xs)
+  inc = is_increasing(xs0; strict=true, errorstrength=0)
+  if ! inc
+    xs0 = reverse(xs0)
+    ys0 = reverse(ys0)
+    xs = reverse(xs)
+  end
+
   ys = similar(xs)
 
   # This special-casing is necessary only because
@@ -183,21 +201,33 @@ function interpolate_helper(;xs0,ys0,xs)
     end
   end
 
-  return ys
+  return inc ? ys : reverse(ys)
 end
 
 """
 Helper funciton: Are the vector elements in the increasing order?
+errorstrength == 0: no message.
+errorstrength == 1: print message.
+errorstrength == 2: stop on error.
 """
-function is_increasing(v; strict = true)
-  lte = strict ? ((x,y) -> x < y) : ((x,y) -> x <= y)
+function is_increasing(v; strict = true, errorstrength = 2)
   length(v) == 0 && error("zero length vector")
-  length(v) == 1 && return nothing
-  for i in axes(v,1)[begin:end-1]
-    (! lte(v[i],v[i+1])) &&
-      error("vector must increase monotonically:" *
-      " v[$(i)],v[$(i+1)]=$(v[i]),$(v[i+1])")
+  length(v) == 1 && error("one length vector")
+  lte = strict ? ((x,y) -> x < y) : ((x,y) -> x <= y)
+  grt = ∘(!,lte) # not smaller
+  a = v[begin]
+  isgood = true
+  for i in axes(v,1)[begin+1:end]
+    if grt(a,v[i])
+      (errorstrength > 0) &&
+        println(stderr, "vec must increase monotonically:" *
+        " v[$(i-1)],v[$(i)]=$(v[i-1]),$(v[i])" )
+      (errorstrength > 1) && error("")
+      isgood = false
+    end
+    a = v[i]
   end
+  return isgood
 end
 
 

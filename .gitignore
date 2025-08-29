@@ -10,12 +10,16 @@
 # ... but re-unignore these specific files.
 !/progs/ctwmodes.f90
 !/progs/ctwmodes_pars.f90
+!/progs/Grid.txt
+!/progs/Ne.txt
 
 !/utils/
 /utils/*
 !/utils/conf.jl
 !/utils/fortbin2nc.jl
 !/utils/plot-grid.jl
+!/utils/Conf_Ne.txt
+!/utils/Conf_topo.txt
 
 !/CITATION.cff
 !/LICENSE

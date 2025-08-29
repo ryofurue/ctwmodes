@@ -4,7 +4,7 @@ implicit NONE
 integer, parameter:: single = kind(1.0)
 integer, parameter:: double = selected_real_kind(2*precision(1.0_single))
 integer, parameter:: im = 30
-integer, parameter:: km = 17
+integer, parameter:: km = 21
 real(double), parameter:: f0 = 0.0001_double
 logical, parameter:: freesurface = .true.
 integer, parameter:: outtype = single
