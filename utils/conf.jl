@@ -164,17 +164,25 @@ Outside the xs0[:] range, extrapolate assuming constant.
   If x is to the right of the xs0 range, y = ys0[end].
 """
 function interpolate_helper(;xs0,ys0,xs)
-  itp = linear_interpolation(xs0,ys0; extrapolation_bc = NaN)
   ys = similar(xs)
-  for i in axes(xs,1)
-    ys[i] = itp(xs[i])
+
+  # This special-casing is necessary only because
+  #   linear_interpolation() doesn't support single-knot cases.
+  if length(ys0) == 1
+    ys  .= ys0[begin] # same value everywhere
+  else
+    itp = linear_interpolation(xs0,ys0; extrapolation_bc = NaN)
+    for i in axes(xs,1)
+      ys[i] = itp(xs[i])
+    end
+    let i = findfirst(!isnan, ys)
+      ys[begin:(i-1)] .= ys0[begin]
+    end
+    let i = findlast(!isnan, ys)
+      ys[(i+1):end]   .= ys0[end]
+    end
   end
-  let i = findfirst(!isnan, ys)
-    ys[begin:(i-1)] .= ys0[begin]
-  end
-  let i = findlast(!isnan, ys)
-    ys[(i+1):end]   .= ys0[end]
-  end
+
   return ys
 end
 
@@ -304,7 +312,7 @@ The cell widths
 is returned just for convenience although it's redundant.
 """
 function get_hh_from_file(fnam)
-  @say "Reading (xx[:], hh[:]) from $(fnam)"
+  @say "Reading h(x) from $(fnam)"
   is = open(fnam; write=false)
 
   nn = @np read_line_parse(is, typelist = (Int,);)
@@ -398,6 +406,7 @@ end
 
 # =============
 """
+Helper:
 Determine dz between z1 and z2 (z1 > z2) such that dz ∝ 1/Nfunc(zz)
   The resultant dz[:]'s exactly split (z1, z2):
     z2 + sum(dz) == z1
@@ -423,9 +432,11 @@ end
 
 
 """
-Set dx and dx for a linear slope.
+Helper:
+Determine dx and dx for a linear slope spanning from z1 to z2.
 We first determine dz[:] from Nfunc(z) and then
   simply use this relation h_x = dz / dx for all dz[k].
+Slope part only.
 """
 function dz_dx_linslope(; z1, z2, dz_sample, h_x, Nfunc)
   dz = dz_from_N(; Nfunc, z1, z2, dz_sample = dz_sample)
@@ -435,12 +446,17 @@ end
 
 
 """
-Linear slope from the surface to the bottom,
-  except that we have a little vertical wall dz[1] at x = 0,
-  to compare our results with those from the Brink-Champman code.
+Example:
+Determine a grid for a simple h(x):
+  - a little vertical wall at x = 0,
+  - followed by a linear slope,
+  - followed by a flat bottom.
+The vertical wall is necessary to compare our results
+  with those from the Brink-Champman code.
+
 Output: dx, dz, kocn
 """
-function linslope(; z1, z2, dz_sample, h_x, Nfunc, xmax)
+function grid_linslope(; z1, z2, dz_sample, h_x, Nfunc, xmax)
   @assert z1 <= 0.0
   (; dx, dz) = dz_dx_linslope(; z1, z2, dz_sample = dz_sample, h_x, Nfunc)
   ksz = length(dz)
@@ -463,7 +479,23 @@ function linslope(; z1, z2, dz_sample, h_x, Nfunc, xmax)
   (dx=dx, dz=dz, kocn=kocn)
 end
 
+
 """
+Example:
+"""
+function grid_linslope_example()
+  x1   = 100.0e3
+  xmax = 300.0e3
+  hbot = 5000.0
+  h_x = hbot/x1
+  nf(z) = 0.003
+  grid_linslope(; z1=-60.0, z2=-5000.0
+                ,dz_sample=30.0, h_x=h_x, Nfunc=nf, xmax=xmax)
+end
+
+
+"""
+Testing:
 Create an artificial topography to test the Fortran code.
 """
 function slope_for_testing()
@@ -574,7 +606,7 @@ The file format is
   dep[nn] Ne(-dep[nn])
 Note that depth >= 0 and z = -depth <= 0.
 """
-function get_Ne_from_file(fnam; zaxx)
+function get_Ne_from_file(fnam; zzax)
   println("Reading Ne(z) from $(fnam) .")
   (zz, bvf) = open(fnam; write=false) do is
     nn = read_line_parse(is, (Int,))
@@ -583,6 +615,7 @@ function get_Ne_from_file(fnam; zaxx)
     for i in 1:nn
       (dep[i],bvf[i]) = read_line_parse(is, (Float64,Float64))
     end
+    zz = -dep
     (zz, bvf)
   end
   println("Mapping Ne(z) onto the model grid.")
@@ -711,7 +744,7 @@ function testing_topo()
   h_x2 = (dep2 - dep1) / (x2 - x1)
   h(x) =
     (x < x1) ? (h_x1 * x) :
-    (x < x2) ? (h_x2 * (x-x1)) : dep2
+    (x < x2) ? (h_x1 * x1 + h_x2 * (x-x1)) : dep2
     xxs = let dx = sort(rand(Uniform(7.0e3, 20.0e3), 11))
     cumsum(dx)
   end
@@ -737,14 +770,35 @@ function testing_topo()
 end
 
 # === Main: Build config files ===
-# I use N_southAus2, totdep, and f0
-#   from SeaParams.jl but that's not necessary.
-# You can just write down your own N(z) funciton here and/or
-# use different values here in this program.
 
+
+# I use N_southAus2 and f0
+#   from SeaParams.jl but that's not necessary.
+# You can just write down your own N(z) funciton here.
+# You can just set your own f0 here.
 push!(LOAD_PATH, pwd())
-using SeaParams: N_southAus2, totdep, f0
-Nfunc = N_southAus2
+#using SeaParams: N_southAus2, totdep, f0
+using SeaParams: SeaParams
+
+Nfunc = SeaParams.N_southAus2 # function N(z)
+
+#=
+"""
+An example of function h(x)
+   - A little vertical wall followed by a linear continental slope
+     followe by a flat bottom.
+   - Undefined for x < 0
+"""
+function hfunc(x)
+  x1 = 100.0e3 # end of continental slope
+  h1   = 60.0 # initial vertical wall
+  hbot = 5000.0 # dep of flat bottom region.
+  h_x = (hbot - h1)/x1
+  (x < 0) ? NaN :
+    (x < x1) ? (h1 + h_x * x) : hbot
+end
+=#
+
 
 # Input files
 const conf_topo_file = "Conf_topo.txt"
@@ -774,9 +828,9 @@ dz_sample = 40.0 # [m]
 (; dx, dz, kocn) = let
   totdep1 = totdep + z1
   h_x = totdep1 / wid_slope
-  linslope(; z1 = z1, z2=-totdep
-           , dz_sample = dz_sample
-           ,h_x, Nfunc = Nfunc, xmax = xmax)
+  grid_ linslope(; z1 = z1, z2=-totdep
+                ,dz_sample = dz_sample
+                ,h_x, Nfunc = Nfunc, xmax = xmax)
 end
 # Because there is one step dz[1] at x = 0,
 #   there are only km-1 horizontal steps along the slope.
@@ -784,21 +838,32 @@ end
 =#
 
 function main()
-  testing_topo()
+#  testing_topo()
 #  (; dx, dz, kocn) = slope_for_testing()
-  (; dx, dz, kocn) = slope_from_file(conf_topo_file)
 
-  # Write the config files
+  # Determine the grid:
+  #   If the conf file exists, read it;
+  #   if not, use an example.
+  (; dx, dz, kocn) = isfile(conf_topo_file) ?
+    slope_from_file(conf_topo_file) :
+    grid_linslope_example()
+
+  # Write grid_file:
   write_grid(grid_file; dx, dz, kocn)
 
+  # Generate N(z) and write the Ne_file:
+  #   If the conf file exists, read it;
+  #   if not, use the Nfunc(z) function.
   let zzax = calc_zzax(dz)
-    #Ne = get_Ne_from_file(conf_Ne_file; zaxx)
-    Ne = grid_Nfunc(Nfunc; zzax)
+    Ne = isfile(conf_Ne_file) ?
+      get_Ne_from_file(conf_Ne_file; zzax) :
+      grid_Nfunc(Nfunc; zzax)
     write_Ne(Ne_file; Ne, zzax)
   end
 
+  # Write par_file.
   let im = length(dx), km = length(dz)
-    write_fort_pars(par_file; im, km, f0, grid_file, Ne_file)
+    write_fort_pars(par_file; im, km, SeaParams.f0, grid_file, Ne_file)
   end
 end
 

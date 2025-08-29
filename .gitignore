@@ -1,13 +1,23 @@
-# Ignore everything by default
-*
+# Ignore everything recursively
+**
 
-# But don't ignore .gitignore itself
-!.gitignore
+# Unignore this direcotry ...
+!/progs/
 
-# Add specific files/directories you want to track below
-# Examples (uncomment and modify as needed):
-!progs/ctwmodes.f90
-!progs/ctwmodes_pars.f90
-!utils/conf.jl
-!utils/fortbin2nc.jl
-!utils/plot-grid.jl
+# ... but ignore everytnig under it ...
+/progs/**
+
+# ... but re-unignore these specific files.
+!/progs/ctwmodes.f90
+!/progs/ctwmodes_pars.f90
+
+!/utils/
+/utils/*
+!/utils/conf.jl
+!/utils/fortbin2nc.jl
+!/utils/plot-grid.jl
+
+!/CITATION.cff
+!/LICENSE
+!/README.md
+!/.gitignore
