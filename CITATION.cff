@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "CTW modes"
+version: "0.7.1"
+doi: "???? 10.1234/zenodo.0000000 ?????"
+authors:
+  - family-names: "Tanaka"
+    given-names: "Yuki"
+  - family-names: "Furue"
+    given-names: "Ryo"
+    orcid: https://orcid.org/0000-0003-0563-1189
+license: "MIT"
