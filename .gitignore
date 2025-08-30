@@ -21,6 +21,9 @@
 !/utils/Conf_Ne.txt
 !/utils/Conf_topo.txt
 
+!/project/
+!/project/*
+
 !/CITATION.cff
 !/LICENSE
 !/README.md

@@ -76,18 +76,24 @@ Notes
   under the user's home directory. No superuser privilege is needed.
 
 ### Quick start
-Download the contents of the `progs` and `utils` directories
-into one place and
+
+1. [Download the repository as a ZIP](https://github.com/ryofurue/ctwmodes/archive/refs/heads/main.zip)
+   (or click the green **Code** button above → **Download ZIP**).
+2. Unzip it.
+3. Enter the project directory, build, and run:
 ```shell
+$ cd ctwmodes-main
+$ cd project
 $ make                # 1. Build the solver.
 $ ./ctwmodes          # 2. Run the solver.
 $ julia fortbin2nc.jl # 3. (optional) Convert binary -> netCDF.
 ```
 will produce a solution.
-The 3rd line is optional if you are fine with a binary file
+Line 3 is optional if you are fine with a binary file
 as output.
-(It will work only when you have a Julia interpreter ready
-and necessary Julia packages have been installed. See below.)
+(The binary-to-netCDF converter
+will work only when you have a Julia interpreter ready
+and have necessary Julia packages installed. See below.)
 
 To change the parameters, edit
 [`ctwmodes_pars.f90`](#specification-of-ctwmodes_pars.f90),
@@ -126,7 +132,7 @@ Solver
 * Download the `utils` folder from this github repository.
 *  Install [`juliaup`](https://github.com/JuliaLang/juliaup) and run it.
 It will create a Julia environment under your home directory (Mac and Linux).
-You may need to add `julia` (the Julia interpreter) to your command search path `PATH`.
+You may need to add `julia` (the Julia interpreter) to your command search path `PATH`. See [the tutorial](#appendix-c-installing-and-using-the-julia-interpreter).
 * Our Julia programs use various packages. See below for how to install them.
 * Some of the tools ([utils/fortbin2nc.jl] and [utils/conf.jl]) are designed to run as a command
 and so you may want to give them an `x` (executable) permission.
@@ -214,7 +220,7 @@ $ ./fortbin2nc.jl
 or on the interpreter:
 ```shell
 $ julia
-. . . [Julia's greetings] . . .
+. . . Julia's logo . . .
 
 julia> include("fortbin2nc.jl")
 ```
@@ -249,7 +255,7 @@ $ julia thescript.jl
 ## 4. Project information
 
 ### Authors
-* [Ryo Furue <ryofurue@gmail.com>](mailto:ryofurue@gmail.com)
+* [Ryo Furue \<ryofurue@gmail.com\>](mailto:ryofurue@gmail.com)
 * Yuki Tanaka
 
 ### Version History
@@ -542,7 +548,7 @@ juliaup update
 Launch the REPL (interactive interpreter):
 ```shell
 $ julia
-. . . [Julia logo etc.] . . .
+. . . Julia's logo etc. . . .
 julia>
 ```
 
