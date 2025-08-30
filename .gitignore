@@ -8,6 +8,7 @@
 /progs/**
 
 # ... but re-unignore these specific files.
+!/progs/Makefile
 !/progs/ctwmodes.f90
 !/progs/ctwmodes_pars.f90
 !/progs/Grid.txt
