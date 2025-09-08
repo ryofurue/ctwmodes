@@ -5,20 +5,19 @@
 #                 (Grid.txt, Ne.txt, and ctwmodes_pars.f90).
 # Author:       Ryo Furue <ryofurue@gmail.com>
 # License:      MIT License
-# Version:      v"0.1"
+# Version:      v"0.7.1"
 # Created:      2025-??-??
 # Updated:      2025-07-01
 # =============================================================================
 """
 """
 
-const SCRIPT_VERSION = v"0.1" # `Base.VERSION` is used by the interpreter.
+const SCRIPT_VERSION = v"0.7.1" # `Base.VERSION` is used by the interpreter.
 
-# Optional: Print version info at runtime
 println("CTW configure script, version ", SCRIPT_VERSION)
 
 
-# conf.jl v0.1:
+# conf.jl v0.7:
 #   Adding functions that determine dx, dz, etc. from h(x).
 #   Adding functions that determine Ne(z) from user-provided gridded Ne.
 #
@@ -62,8 +61,10 @@ using Interpolations
 #  xx[0]--dx[1]--xx[1]--dx[2]-- . . . --dx[nn-1]--xx[nn-1]
 # we need zero-based arrays.
 using OffsetArrays
+const nooffs = OffsetArrays.no_offset_view
 
 # Internal use, for testing
+using DataFrames # tabular output for debugging
 using Random  # We generate a ramdom slope.
 using GLMakie # Plot the slope for testing.
 
@@ -175,14 +176,48 @@ The interpolator allows only for strictly increasing
  x coordinates. If it's decreasing, reverse all vectors.
 """
 function interpolate_helper(;xs0,ys0,xs)
-  inc = is_increasing(xs0; strict=true, errorstrength=0)
-  if ! inc
+  @assert length(xs) > 0
+  @assert length(xs0) == length(ys0)
+  @assert length(xs0) > 0
+
+  inc0 = if (length(xs0) == 1)
+    true
+  else
+    let
+      inc1 = is_monotonic(xs0; cmp = <, errorstrength=0)
+      dec1 = is_monotonic(xs0; cmp = >, errorstrength=0)
+      if ! (inc1 || dec1)
+        error("xs0 must be increasing or decreasing.")
+      end
+      inc1
+    end
+  end
+
+  if ! inc0 # interpolator accepts only increasing coordinates (xs0).
     xs0 = reverse(xs0)
     ys0 = reverse(ys0)
+  end
+
+  inc = if (length(xs) == 1)
+    true
+  else
+    let
+      inc1 = is_monotonic(xs; cmp = <=, errorstrength=0)
+      dec1 = is_monotonic(xs; cmp = >=, errorstrength=0)
+      if ! (inc1 || dec1)
+        error("xs must be increasing or decreasing.")
+      end
+      inc1
+    end
+  end
+
+  # Because xs0 is forced to be in increasing order,
+  # we have to force xs, too.
+  if ! inc
     xs = reverse(xs)
   end
 
-  ys = similar(xs)
+  ys = similar(xs, eltype(ys0))
 
   # This special-casing is necessary only because
   #   linear_interpolation() doesn't support single-knot cases.
@@ -205,6 +240,8 @@ function interpolate_helper(;xs0,ys0,xs)
 end
 
 """
+### Obsolete:
+  We should implement this in terms of is_monotonic() below ###
 Helper funciton: Are the vector elements in the increasing order?
 errorstrength == 0: no message.
 errorstrength == 1: print message.
@@ -226,6 +263,40 @@ function is_increasing(v; strict = true, errorstrength = 2)
       isgood = false
     end
     a = v[i]
+  end
+  return isgood
+end
+
+"""
+Helper funciton: Are the vector elements
+  in an increasing or decreasing order?
+
+cmp is the comparison function, <, <=, >, >=
+
+Usage example
+```
+   is_monotonic(v; cmp = <= ) # increasing order
+   is_monotonic(v; cmp = < ) # strictly increasing order
+```
+errorstrength == 0: no message.
+errorstrength == 1: print message.
+errorstrength == 2: stop on error.
+"""
+function is_monotonic(v; cmp, errorstrength = 2)
+  length(v) == 0 && error("zero length vector")
+  length(v) == 1 && error("one length vector")
+  prev = v[begin]
+  isgood = true
+  for i in axes(v,1)[begin+1:end]
+    if ! cmp(prev,v[i])
+      (errorstrength > 0) &&
+        println(stderr, "vec must increase or decrease:" *
+        " v[$(i-1)],v[$(i)]=$(v[i-1]),$(v[i])" )
+      (errorstrength > 1) && error("") # stop
+      isgood = false
+      break
+    end
+    prev = v[i]
   end
   return isgood
 end
@@ -386,29 +457,90 @@ function get_hh_from_file(fnam)
       @say @sshow im
       dx = [read_line_parse(is, (Float64,)) for i in 1:im]
       xx = OffsetArray(vcat(0.0, cumsum(dx)), -1)
+      if xx[end] < xmax
+        @say "xx[end] = $(xx[end]) < xmax = $(xmax) . Extending domain."
+        dx_flat = dx_flatbottom(; dx1=dx[end], xx1=xx[end], xmax=xmax)
+        append!(dx, dx_flat)
+        xxnew = cumsum(dx_flat) .+ xx[end] # new xx points
+        append!(xx, xxnew)
+        @say "new im = $(length(dx))"
+      elseif xx[end] > xmax
+        @say "xx[end] = $(xx[end]) > xmax = $(xmax) . Ignoring xmax."
+      end
+      #@show dx
+      #@show xx
       hh = interpolate_helper(;xs0=xx0, ys0=hh0, xs=xx)
       (;hh=hh,xx=xx,dx=dx)
     end
   close(is)
+  @assert sum(ret.dx) ≈ xmax
   return ret
+end
+
+"""
+Helper function to determine dx in the flat bottom region.
+"""
+function dx_flatbottom(; dx1, xx1, xmax)
+  @assert xmax > xx1
+  dx = Vector{typeof(dx1)}(undef,0)
+  xx = xx1
+  d = dx1
+  while (xx < xmax)
+    d *= 1.1
+    push!(dx, d)
+    xx += d
+  end
+  dx = dx .* (xmax - xx1)/sum(dx)
+end
+
+
+
+"""
+Testing: Display how extend_domain did its job.
+hh,  xx,  dx:  original gridded values
+hhn, xxn, dxn: new values
+"""
+function extend_domain_display(;hh,xx,dx, hhn, xxn, dxn)
+  (l,ln) = (length(dx),length(dxn))
+  dx_padded = (l < ln) ? vcat(dx,fill(missing,ln-l)) : dx
+  df = DataFrame(dx=dx_padded, new_dx=dxn)
+  println(df)
+
+  # DataFrame doesn't support OffsetArrays
+  iax = axes(xxn,1)
+  xx  = nooffs(xx)
+  xxn = nooffs(xxn)
+  hh  = nooffs(hh)
+  hhn = nooffs(hhn)
+  (l,ln) = (length(xx),length(xxn))
+  xx_padded = (l < ln) ? vcat(xx,fill(missing,ln-l)) : xx
+  hh_padded = (l < ln) ? vcat(hh,fill(missing,ln-l)) : hh
+  df = DataFrame(i=iax, xx=xx_padded, new_xx=xxn
+                 ,hh=hh_padded, new_hh=hhn)
+  println(df)
 end
 
 
 """
 Helper function to extend dx in the flat-bottom region.
+(xx[i], hh[i]) is the topography to the right of cell center i:
+   hh[0:imax], xx[0:imax], dx[1:imax]
+xx[0] is the left edge.
 """
 function extend_domain(;hh,xx,dx,xmax)
   (xx[end] >= xmax) && error("Already beyond xmax: xx=$(xx[end]),xmax=$(xmax)")
-  hhn = copy(hh)
-  xxn = copy(xx)
-  dxn = copy(dx)
-  while xxn[end] < xmax
-    d1 = 1.1 * dxn[end]
-    x1 = xxn[end] + d1
-    push!(dxn,d1)
-    push!(xxn,x1)
-    push!(hhn,hh[end]) # flat bottom
+  @say "extending domain"
+  dx_flat = dx_flatbottom(; dx1=dx[end], xx1=xx[end], xmax=xmax)
+  dxn = vcat(dx, dx_flat)
+  hhn = copy(hh) # offset array
+  append!(hhn, fill(hh[end], length(dx_flat))) # flat bottom
+  xxn = copy(xx) # extend xxn below
+  for d in dx_flat
+    x = xxn[end] + d # right edge
+    push!(xxn,x)
   end
+  @assert axes(xxn,1) == axes(hhn,1)
+  extend_domain_display(;hh,xx,dx, hhn, xxn, dxn)
   (hh = hhn, xx = xxn, dx = dxn)
 end
 
@@ -469,7 +601,7 @@ We first determine dz[:] from Nfunc(z) and then
 Slope part only.
 """
 function dz_dx_linslope(; z1, z2, dz_sample, h_x, Nfunc)
-  dz = dz_from_N(; Nfunc, z1, z2, dz_sample = dz_sample)
+  dz = dz_from_N(; Nfunc, z1, z2, dz_sample)
   dx = dz ./ h_x #
   (dx=dx, dz=dz)
 end
@@ -488,24 +620,27 @@ Output: dx, dz, kocn
 """
 function grid_linslope(; z1, z2, dz_sample, h_x, Nfunc, xmax)
   @assert z1 <= 0.0
-  (; dx, dz) = dz_dx_linslope(; z1, z2, dz_sample = dz_sample, h_x, Nfunc)
+  (; dx, dz) = dz_dx_linslope(; z1, z2, dz_sample, h_x, Nfunc)
   ksz = length(dz)
+  @assert length(dx) == ksz # because linear slope.
   kocn = collect(1:ksz) # the slope starts at k = 1
-  if z1 < 0
+  if z1 < 0 # shift dz and kocn downward by one step.
     dz_init = -z1 # little vertical wall
     dz = vcat(dz_init, dz) # prepent dz_init
     ksz += 1
     kocn = collect(2:ksz) # the slope starts at k = 2
-    println("vertical wall at x = 0; dz_init = $(dz_init)")
+    println("Vertical wall at x = 0; dz_init = $(dz_init)")
   end
+  println("$(length(dx)),$(ksz) hor. and vert. cells along the slope.")
+  kbot = ksz
   xx = sum(dx) # bottom of the slope
-  d = dx[end]
-  while xx < xmax
-    d = 1.1*d
-    push!(dx, d)
-    xx += d
-    push!(kocn, ksz)
-  end
+  dx_flat = dx_flatbottom(;dx1=dx[end],xx1=xx,xmax=xmax)
+  sz = length(dx_flat)
+  println("Adding $(sz) flat-bottom cells from xx=$(xx) to xmax=$(xmax)")
+  append!(dx,  dx_flat)
+  append!(kocn,fill(kbot,sz))
+  @assert sum(dx) ≈ xmax
+  @assert sum(dz) ≈ abs(z2)
   (dx=dx, dz=dz, kocn=kocn)
 end
 
@@ -516,11 +651,12 @@ Example:
 function grid_linslope_example()
   x1   = 100.0e3
   xmax = 300.0e3
+  h0 = 50.0
   hbot = 5000.0
-  h_x = hbot/x1
+  h_x = (hbot - h0)/x1
   nf(z) = 0.003
-  grid_linslope(; z1=-60.0, z2=-5000.0
-                ,dz_sample=30.0, h_x=h_x, Nfunc=nf, xmax=xmax)
+  grid_linslope(; z1=-h0, z2=-5000.0
+                ,dz_sample=100.0, h_x=h_x, Nfunc=nf, xmax=xmax)
 end
 
 
@@ -637,7 +773,7 @@ The file format is
 Note that depth >= 0 and z = -depth <= 0.
 """
 function get_Ne_from_file(fnam; zzax)
-  println("Reading Ne(z) from $(fnam) .")
+  @say "Reading Ne(z) from $(fnam) ."
   (zz, bvf) = open(fnam; write=false) do is
     nn = read_line_parse(is, (Int,))
     dep = fill(NaN,nn)
@@ -648,7 +784,7 @@ function get_Ne_from_file(fnam; zzax)
     zz = -dep
     (zz, bvf)
   end
-  println("Mapping Ne(z) onto the model grid.")
+  @say "Mapping Ne(z) onto the model grid."
   regrid_Ne(; zs0=zz, Ne0=bvf, zzax=zzax)
 end
 
@@ -763,9 +899,7 @@ end
 Produce a sample Conf_topo.txt
   See slope_from_file() for the format of the file
 """
-function testing_topo()
-  #format = :format1
-  format = :format2
+function testing_topo(; format)
   dep1 = 150.0
   dep2 = 5500.0
   x1 = 100.0e3
@@ -778,7 +912,8 @@ function testing_topo()
     xxs = let dx = sort(rand(Uniform(7.0e3, 20.0e3), 11))
     cumsum(dx)
   end
-  xmax = xxs[end] + 100.0e3
+  #xmax = xxs[end] + 200.0e3
+  xmax = 300.0e3
   @say "Generating $(conf_topo_file)"
   open(conf_topo_file; truncate=true) do os
     println(os, length(xxs))
@@ -788,7 +923,7 @@ function testing_topo()
     println(os, xmax)
     if (format == :format2)
       println("testing_topo: Format 2: Adding dx")
-      dx = sort(rand(Uniform(2.0e3, 21.0e3), 30))
+      dx = sort(rand(Uniform(2.0e3, 21.0e3), 20))
       println(os, length(dx))
       for d in dx
         println(os, "$(d)")
@@ -809,8 +944,8 @@ end
 push!(LOAD_PATH, pwd())
 #using SeaParams: N_southAus2, totdep, f0
 using SeaParams: SeaParams
-
-Nfunc = SeaParams.N_southAus2 # function N(z)
+# Nfunc = SeaParams.N_southAus2 # function N(z)
+Nfunc = SeaParams.N_const2 # function N(z)
 
 #=
 """
@@ -868,8 +1003,11 @@ end
 =#
 
 function main()
-#  testing_topo()
+# Testing: Internally produce ad-hoc topography.
 #  (; dx, dz, kocn) = slope_for_testing()
+
+# Testing: Generate Conf_topo.txt .
+#  testing_topo(; format=:format1)
 
   # Determine the grid:
   #   If the conf file exists, read it;

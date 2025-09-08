@@ -2,11 +2,16 @@
 # Just to visualize the grid configuration,
 # read Grid.txt (see conf.jl) and plot it.
 
+#packages_used_in_this_script = [
+#"GLMakie", "Match", "NamedPositionals", "NCDatasets", "OffsetArrays"]
+#using Pkg; Pkg.add(packages_used_in_this_script)
+
 const fnam_txt_default = "Grid.txt"
 const fnam_nc_default  = "Eigenmodes-z.nc"
 
 #using CairoMakie
-using GLMakie
+#using GLMakie
+using Makie
 using Match
 using NamedPositionals # experimental
 using NCDatasets
@@ -363,8 +368,8 @@ end
 
 #---
 function determine_fnam()
-  isfile(fnam_nc_default) && return fnam_nc_default
   isfile(fnam_txt_default) && return fnam_txt_default
+  isfile(fnam_nc_default) && return fnam_nc_default
   error("Neither $(fnam_nc_default) or $(fnam_txt_default) exits.")
 end
 
@@ -381,7 +386,7 @@ pnts = slope_bottom(; dx, dz, kocn, iocn, im, km)
 
 const conf_topo = "Conf_topo.txt"
 (; xx0, hh0) = isfile(conf_topo) ?
-  get_hh_from_file(conf_topo) : (nothing,nothing)
+  get_hh_from_file(conf_topo) : (xx0=nothing,hh0=nothing)
 
 fig = Figure()
 ax = Axis(fig[1,1]
@@ -407,5 +412,18 @@ if !isnothing(hh0)
 end
 plot_indices!(ax; dx, dz)
 
-display(fig)
+# Save or display fig.
+if abspath(PROGRAM_FILE) == @__FILE__
+  # This script is being run directly from the command line.
+  using CairoMakie
+  img = "plot-grid-$(fnam).pdf"
+  save(img, fig)
+  println("plot saved in $(img) .")
+else
+  # his script is being included or run from the REPL.
+  using GLMakie
+  display(fig)
+end
+
+
 #save("tmp-nc.pdf", fig)

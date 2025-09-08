@@ -7,6 +7,7 @@ in the low-frequency limit (ω ≪ f).
 <!-- These links are invisible in the rendered version. -->
 [progs]: progs
 [utils]: utils
+[project]: project
 
 [utils/conf.jl]:       utils/conf.jl
 [utils/fortbin2nc.jl]: utils/fortbin2nc.jl
@@ -75,33 +76,54 @@ Notes
 * On Mac or Linux, `juliaup` installs the Julia environment
   under the user's home directory. No superuser privilege is needed.
 
-### Quick start
+### Quick Start
 
 1. [Download the repository as a ZIP](https://github.com/ryofurue/ctwmodes/archive/refs/heads/main.zip)
    (or click the green **Code** button above → **Download ZIP**).
 2. Unzip it.
-3. Enter the project directory, build, and run:
-```shell
-$ cd ctwmodes-main
-$ cd project
-$ make                # 1. Build the solver.
-$ ./ctwmodes          # 2. Run the solver.
-$ julia fortbin2nc.jl # 3. (optional) Convert binary -> netCDF.
-```
-will produce a solution.
-Line 3 is optional if you are fine with a binary file
-as output.
-(The binary-to-netCDF converter
-will work only when you have a Julia interpreter ready
-and have necessary Julia packages installed. See below.)
+3. Enter the project directory:
 
-To change the parameters, edit
+    ```shell
+    $ cd ctwmodes-main
+    $ cd project
+	```
+
+4. (Linux) Modify `Makefile` in such a way that `LAPACK` is linked.
+5. Build and run:
+
+    ```shell
+    $ make       #(1) Build the solver.
+    $ ./ctwmodes #(2) Run the solver.
+    ```
+will produce a solution using the sample topography h(x) and the sample
+stratification N(z) in the `project` directory.
+
+4. Optionally, you can convert the binary output to a netCDF file:
+
+    ```shell
+    $ bash ../utils/install-julia.bash #(3) Install Julia and some packages.
+
+    . . . Restart the terminal to activate new PATH . . .
+
+    $ julia fortbin2nc.jl              #(4) Convert binary -> netCDF.
+    ```
+    You need to do step (3) only once; next time, you just skip it.
+
+    > ℹ️ The script `utils/install-julia.bash` is provided to install
+    > a Julia environment and then install the packages our scripts use.
+	> The julia installer will modify your PATH, to activate which
+	> you can just restart you terminal.
+    > This script isn't essential at all.
+    > We provide
+    > [a brief tutorial](#appendix-c-installing-and-using-the-julia-interpreter)
+	> to install Julia and the packages.
+
+5. To change the parameters or configuration, edit
 [`ctwmodes_pars.f90`](#specification-of-ctwmodes_pars.f90),
 [`Grid.txt`](#specification-of-grid.txt), and
-[`Ne.txt`](#specification-of-ne.txt).
-
-We do not necessarily recommend putting everything in one directory, though. The following explanation assumes that we have three directories, [progs], [utils], and a third directory where you run the solver.
-
+[`Ne.txt`](#specification-of-ne.txt) under the `project` directory.
+You can do this
+by [using the script `conf.jl`](#optional-generating-the-configuration-files).
 
 ### Notes on the units
 Among the input parameters,
@@ -114,39 +136,55 @@ gravitational constant g in [progs/ctwmodes.f90].
 (In the rigid-lid mode, this restriction is lifted.)
 
 
+## 3. Details
+
+The above [Quick Start](#quick-start) shows a minimal procedure,
+where all files are placed in the [project] directory.
+
+The subsequent explanation uses our original directory structure
+and does not assume that the user did the "Quick Start".
+
+<!--
+But, we do not necessarily recommend putting everything in one directory.
+This github repository reflects our original directory structure:
+the Fortran solver resides in the [progs] directory,
+the other supporting tools in the [utils] directory,
+and the [project] directory just houses symlinks to the files.
+The following explanation uses [progs], [utils], and a third directory where you run the solver.
+-->
+
+
 ### Installing & preparing
 
 Solver
 
-* Download the `progs` folder from this github repository.
+* The [progs] directory houses the solver.
 * (Linux/Unix) Install `LAPACK` or make sure it is available to the Fortran compiler you use.
-* The current `Makefile` assumes `gfortran`.
-  If you use a different Fortran compiler, edit `Makefile` accordingly,
-  where you may needed to alter options related to `LAPACK`.
-* If you are on Unix/Linux,
-  you may need to know how to link `LAPACK` and modify `Makefile` accordingly.
+* The current `Makefile` assumes `gfortran`. If you use a different Fortran compiler, edit `Makefile` accordingly, where you may needed to alter options related to `LAPACK`.
+* If you are on Unix/Linux, you may need to know how to link `LAPACK` and modify `Makefile` accordingly.
 
 
 (Optional) Tools
 
-* Download the `utils` folder from this github repository.
-*  Install [`juliaup`](https://github.com/JuliaLang/juliaup) and run it.
-It will create a Julia environment under your home directory (Mac and Linux).
-You may need to add `julia` (the Julia interpreter) to your command search path `PATH`. See [the tutorial](#appendix-c-installing-and-using-the-julia-interpreter).
+* The [utils] directory houses several tools.
+*  Install [`juliaup`](https://github.com/JuliaLang/juliaup) and run it. It will create a Julia environment under your home directory (Mac and Linux). You may need to add `julia` (the Julia interpreter) to your command search path `PATH`. See [the tutorial](#appendix-c-installing-and-using-the-julia-interpreter).
 * Our Julia programs use various packages. See below for how to install them.
 * Some of the tools ([utils/fortbin2nc.jl] and [utils/conf.jl]) are designed to run as a command
 and so you may want to give them an `x` (executable) permission.
 
 <!--
 ### Running the program
+## 3. Running
 -->
 
-## 3. Running
+
 
 ### (Optional) Generating the configuration files
-The formats of the configuration files, `ctwmodes_pars.f90`, `Grid.txt`, and `Ne.txt`, are simple and you can easily write them on a text editor.
-The formats of these files are described in
-[Appendix A](#appendix-a-parameter-file-formats).
+You can easily write or edit
+the configuration files, `ctwmodes_pars.f90`, `Grid.txt`, and `Ne.txt`,
+as their formats are simple
+([Appendix A](#appendix-a-parameter-file-formats)).
+
 
 But, if you want to create these files from observational data of N(z) or real topography h(x) or from functional forms of h(x) and N(z), you might want to use [utils/conf.jl].
 
@@ -158,11 +196,18 @@ The formats of these files are
 described [below](#hx-input-file-for-conf.jl)
 and [below](#nz-input-file-for-conf.jl).
 Examples are provided as [utils/Conf_topo.txt]
-and [utils/Conf_Ne.txt] (????? Not yet provided. Not tested ???????)
+and [utils/Conf_Ne.txt].
 
 If the corresponding data file does not exist,
 `conf.jl` uses a continuous function for h(x) or N(z).
-So, edit this script to use your own functional forms.
+Currently, `conf.jl` uses functions defined in
+`SeaParams.jl`.
+So, you can add your function to this module
+edit `conf.jl` to use it.
+But `SeaParams.jl` isn't an essential part of
+the tools at all.
+You can directly define your function in `conf.jl`.
+
 
 
 ### (Optional) Visualizing the topography and grid
@@ -182,8 +227,7 @@ See [the explanation of `fortbin2nc.jl`](#optional-converting-the-binary-output-
 ### Running the solver
 Prepare the three parameter files (all text): `ctwmodes_pars.f90`, `Grid.txt`, and `Ne.txt`.
 
-* Copy `ctwmodes_pars.f90` into the `progs` directory,
-where the Fortran source code resides.
+* Copy `ctwmodes_pars.f90` into the `progs` directory, where the Fortran source code resides.
 * Copy `Grid.txt` and `Ne.txt` into the directory where you run the solver.
 
 The formats of parameter files are described in
@@ -229,8 +273,7 @@ First time you run the program, you'll get errors for missing packages.
 To resolve them,
 
 * You first run the script within the interpreter (the second method above).
-* On each missing package, you press the `]` key to enter the `pkg`
- mode and `add` the missing package there.
+* On each missing package, you press the `]` key to enter the `pkg` mode and `add` the missing package there.
 * Press `^C` (control-C) to return to the `julia>` prompt.
 
 Repeat this until you stop seeing missing package errors.
@@ -239,8 +282,6 @@ There are some optional features, which you can learn by
 ```shell
 $ ./fortbin2nc.jl --help
 ```
-
-
 
 
 <!--
@@ -287,9 +328,29 @@ Inspiration, code snippets, etc.
 ## Appendix A: Parameter file formats
 
 ### Binary output format
+(If you don't use Fortran,
+you can still read the output from `ctwmodes.f90`
+because it's a "stream" ("plain", "raw") binary.)
+
+
 The best way to specify the format is to copy
-the write statements in [progs/ctwmodes.f90]:
+the write statements from [progs/ctwmodes.f90]:
 ```fortran
+  integer:: M, im, km
+  integer:: num(0:im+1,0:km+1)
+  integer:: kocn(0:im+1)
+  integer:: icon(0:km+1)
+  integer:: outtype   ! usually 4 or 8
+  real(?):: alphaR(M) ! c(M)
+  real(?):: alphaI(M) ! == 0
+  real(?):: VR(M,M)   ! CTW modes
+  real(?):: dx(0:im+1)
+  real(?):: dz(0:km+1)
+  real(?):: f0
+  real(?):: N2e(0:km)
+  open(newunit=uni, file=ofile &
+	,access="STREAM", form="UNFORMATTED" &
+    ,status="REPLACE", position="REWIND")
   write(uni) M, im, km
   write(uni) num
   write(uni) kocn
@@ -312,7 +373,7 @@ See [the explanation of `ctwmodes_pars.f90`](#specification-of-ctwmodes_pars.f90
 See below.
 * `kocn`: the k index of the deepest ocean grid cell at location i.
 * `iocn`: the i index of the leftmost ocean grid cell at depth k.
-* `outtype`: `double` or `single`, specifying the precision of output.
+* `outtype`: (usually) 4 or 8, specifying the precision of output.
 * `alphaR`, `alphaI`: Real and imaginary parts of the eigenvalue c(n).
   Currently, `alphaI` == 0 for all the modes.
 * `VR`: `VR[ik,n]` is the value of F(x,z) of mode n
@@ -349,11 +410,17 @@ It's proven that there are exactly `km` physical modes
 and the remaining `M - km` modes are all unphysical with zero
 eigenvalues (`alphaR(n)` == 0).
 
-**Notes** on the Fortran sequential binary format:
-It's not a pure sequence of binary numbers:
-The "records" are separated by record markers.
-If you need to read the output using another computer language,
-we can help you.
+**Notes** on the binary format. By default, the output is "stream" binary:
+it's just a linear sequence of binary values.
+To switch to Fortran's "sequential" binary,
+set
+```fortran
+   logical, parameter:: streambin = .false. ! output is sequential binary.
+```
+in [progs/ctwmodes.f90].
+The filename of a stream binary ends in `.bin` whereas
+that of a sequential binary ends in `.fort.bin`.
+
 
 
 ### Specification of `ctwmodes_pars.f90`
@@ -438,8 +505,8 @@ This data file must use the grid scheme of the `ctwmodes` solver:
     - `zz[0] == 0`: sea surface
     - `zz[k] == zz[k-1] - dz[k]`: cell edges
 
-In this sense, it wholly depends on
-[`Grid.txt`](#specification-of-grid.txt).
+In other words, the `zz` coordinates here must agree
+with `dz` specified in [`Grid.txt`](#specification-of-grid.txt).
 
 
 ## Appendix B: Input files to `conf.jl`
@@ -462,6 +529,10 @@ where `nn` is the number of the points where the pair (x, h(x)) is defined
 and `xmax` is the position of the right edge beyond the last topography point
 `xx[nn-1]`. Between `xx[nn-1]` and `xmax` a flat bottom of `h(xx[nn-1])` is assumed.
 
+Before processing,
+the `xx` coordinates (including `xmax`) are first shifted so that
+the 0th position coincides with x = 0.
+
 The grid spacings for the CTW calculation will be determined by the intervals
 between `xx`'s.
 
@@ -480,14 +551,24 @@ dx[2]
 dx[im]
 ```
 where `im` is the number of grid cells in the x direction
-and `dx` are the grid spacings.
-In this case `h(x)` values are interpolated onto the gridpoints.
-If the gridpoint falls outside the range of `xx`'s,
-the h value
-at the closed defined point is used (that is a "constant extrapolation").
+and `dx` are the cell widths.
+Before processing,
+the `xx` coordinates (including `xmax`) are first shifted so that
+the 0th position coincides with x = 0.
 
-In both cases, the first position 'xx[0]' is shifted to x = 0
-in the calculated results.
+In this case `h(x)` values are interpolated onto the gridpoints
+defined by `dx` starting from `x = 0`.
+If the gridpoint falls outside the range of (the shifted) `xx`'s,
+the h value
+at the closest defined point is used (that is a "constant extrapolation").
+This extrapolation can happen only to the right of `xx[n-1]`
+because `xx[0]` is shifted to `x = 0`,
+and it will create the flat-bottom region, assuming
+that the grid created by `dx` extends beyond `x = xx[nn-1]`.
+
+Currently, `xmax` is ignored for Format 2 because `dx` determines the grid.
+We could extend `conf.jl` so that the grid determined
+by `dx` be automatically extended to reach `xmax`.
 
 
 ### N(z) input file for `conf.jl`
@@ -557,12 +638,12 @@ To run your script within the REPL:
 julia> include("yourscript.jl")
 ```
 To run it from the shell command line:
-```julia
-julia "yourscript.jl"
+```shell
+$ julia "yourscript.jl"
 ```
 As usual for scripting languages, you can turn your scripts into a command
 by starting the script with
-```julia
+```shell
 #!/usr/bin/env julia
 ```
 and give the script file the exec permission by
@@ -597,3 +678,29 @@ To update all the packages
 ```julia
 (@v1.11) pkg> update
 ```
+
+## Appendix D: Notes on the structure of `ctwmodes.f90`
+The core of `ctwmodes.f90` is where the matrices
+A and B are defined.
+This part resides in a module within the source file.
+
+After version 006b, we tested a new discretization scheme.
+We anticipated that we would perhaps provide the two schemes
+in such a way the user can switch between them.
+To make this switching easy,
+we extracted the matrix-definition part from 006b
+into an external module and modified it for the new scheme.
+
+That process resulted in `ctwmodes-006c.f90`, which handled only logistics,
+plus the external module for the new scheme.
+
+After comparing this with results from the Brink & Champan code,
+we decided the new scheme is much better and there is no point in providing
+the original scheme.
+
+When we created version 007 to be published as 0.7.0, we included the
+module in the source file of `ctwmodes.f90`
+instead of pasting the contents of the module into the main program.
+If we ever need to extend our program, we will again separate
+the source file into the main program and the module
+and implement new schemes in the latter.

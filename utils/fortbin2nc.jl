@@ -1,11 +1,41 @@
 #!/usr/bin/env julia
+# =============================================================================
+# Tool Name:    CTW data conversion script
+# Description:  Script to convert the output of ctwmodes.f90
+#                 to a netCDF file.
+# Author:       Ryo Furue <ryofurue@gmail.com>
+# License:      MIT License
+# Version:      v"0.7"
+# Created:      2025-??-??
+# Updated:      2025-09-04
+# =============================================================================
+const SCRIPT_VERSION = v"0.7" # `Base.VERSION` is used by the interpreter.
+
+println("CTW data conversion script, version ", SCRIPT_VERSION)
+
+"""
+*.bin      is the "stream" binary.
+*.fort.bin is the Fortran sequential binary.
+"""
+const binext     = "bin"
+const fortbinext = "fort.bin"
+function filetype(fnam)
+  if     ! isnothing(match(r".*\.fort\.bin$", fnam))
+    :sequential
+  elseif ! isnothing(match(r".*\.bin$"      , fnam))
+    :stream
+  else
+    :unkown
+  end
+end
 
 """
 Default names for the input and output files.
 You can specify the names by command line options. See the usage.
 """
 const filestem = "Eigenmodes-z"
-const inf_def = "$(filestem).fort.bin"
+const inf_def1 = "$(filestem).$(binext)"
+const inf_def2 = "$(filestem).$(fortbinext)"
 const ouf_def = "$(filestem).nc"
 
 # --- Determine input and output files ---
@@ -30,8 +60,12 @@ args = @tuplearguments begin
     \tfortbin2nc -i infile [outfile]
     \tfortbin2nc -o outfile [infile]"""
   @helpdescription """
-  Also supported are
+  Also supported is
     '--title=<title>' or '-t <title>'
+
+  If the extension of the input file is ".bin",
+    a raw (stream) binary file is assumed; if it's "fort.bin",
+    a Fortran sequential binary file is assumed.
     """
 #  @argumentflag     dble  "-d" "--double"
   @argumentoptional String inf1  "-i" "--input"
@@ -43,11 +77,10 @@ args = @tuplearguments begin
 end
 
 
-
 """
 Determine input and output files from the command line parameters.
 """
-function pick_files(inf1,ouf1,par1,par2;inf_def,ouf_def)
+function pick_files(inf1,ouf1,par1,par2;inf_def1, inf_def2, ouf_def)
   bad(x)  = isnothing(x)
   good(x) = ! bad(x)
   inf = good(inf1) ? inf1 : nothing
@@ -68,7 +101,15 @@ function pick_files(inf1,ouf1,par1,par2;inf_def,ouf_def)
   end
 
   if bad(inf)
-    inf = inf_def
+    if isfile(inf_def1)
+      inf = inf_def1
+    elseif isfile(inf_def2)
+      inf = inf_def2
+    else
+      myerror(2, "Neither $(inf_def1) or $(inf_def2) exists.")
+    end
+    isfile(inf_def1) && isfile(inf_def2) &&
+      println("## Both $(inf_def1) and $(inf_def2) exist. I've taken the former.")
   end
 
   if bad(ouf)
@@ -84,9 +125,18 @@ function pick_files(inf1,ouf1,par1,par2;inf_def,ouf_def)
   return (inf,ouf)
 end
 
+# --- determine inf and ouf ---
 (inf,ouf) = pick_files(args.inf1, args.ouf1, args.par1, args.par2;
-                       inf_def=inf_def, ouf_def=ouf_def)
+                       inf_def1, inf_def2, ouf_def)
+
 println("infile=$(inf); outfile=$(ouf)")
+
+# --- determine whether inf is stream binary or not.
+is_streambin = @match filetype(inf) begin
+  :stream => true
+  :sequential => false
+  _ => myerror(5,"$(inf): unknown file type.")
+end
 
 # --- check the files ---
 """
@@ -112,7 +162,7 @@ using CTW_data_tools
 #outtype = args.dble ? (outtype = Float64, ) : ()
 
 (; num, alphaR, alphaI, pr, dx, dz, f0, bvf2e, kocn, iocn) =
-  read_fort_data(inf) # ; intype...
+  read_fort_data(inf; is_streambin) # ; intype...
 
 @show kocn
 @show iocn

@@ -19,6 +19,8 @@
 !/utils/conf.jl
 !/utils/fortbin2nc.jl
 !/utils/plot-grid.jl
+!/utils/CTW_data_tools.jl
+!/utils/SeaParams.jl
 !/utils/Conf_Ne.txt
 !/utils/Conf_topo.txt
 

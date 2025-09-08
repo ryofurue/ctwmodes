@@ -338,12 +338,13 @@ subroutine eqs_slope_bottom(A, B, l, iocn, kocn, num, dx, dz, N2e, fsq, &
   real(double), intent(in)   :: N2e(0:), fsq
   real(double), intent(in)   :: sfOne(:), sfTwo(:)
   character(*), parameter:: fmt&
-      = "(1X,'l nc =',I8,I8,'; i k =',I5,I5,A)"
+      = "(4X,'l nc =',I8,I8,'; i k =',I5,I5,A)"
   real(double):: dxr, dzu, hx
   integer:: i, k, no, nr, nu, nc, im, km
   im = size(dx) - 2
   km = size(dz) - 2
   ! Scan the cell-center gridpoints adjacent to the slope-bottom.
+  write(*,*) "eqs_slope_bottom: define slope-bottom entries of A and B:"
   k = 1
   i = iocn(k)
   do while (i <= im)
@@ -493,10 +494,11 @@ subroutine calc_iocn(iocn, mask)
     end if
     iocn(k) = i
     !!>>>>>>>>>
-    write(*,*) "calc_iocn: i, k, iocn(k) = ", i, k, iocn(k)
+    !!write(*,*) "calc_iocn: i, k, iocn(k) = ", i, k, iocn(k)
     !!<<<<<<<<
   end do
   iocn(0) = iocn(1)
+  write(*,*) "calc_iocn: iocn(:) are calculated from mask(:,:)"
 end subroutine calc_iocn
 
 ! Follow the slope-bottom to look for isolated convex land cell.
@@ -559,14 +561,14 @@ subroutine calc_ocn(iocn, mask, kocn)
   !!write(*,*) "calc_ocn after shaving: iocn=",iocn
   !!<<<<<
   if (n /= 0) then
-    write(*,"(*(1X,G0))") "nshaved =", n, "convex steps have been shaved."
+    write(*,"(*(1X,G0))") "calc_ocn: nshaved =", n, "convex steps have been shaved."
     call shave_convex(iocn=iocn, kocn=kocn, mask=mask, nshaved=n)
     if (n /= 0) then
       write(ERROR_UNIT,*) "***Second shaving: n = ", n
       error stop 7
     end if
   else
-    write(*,*) "No shaving was necessary."
+    write(*,*) "calc_ocn: no shaving was necessary."
   end if
 end subroutine calc_ocn
 
@@ -621,6 +623,7 @@ subroutine calc_num(num, iocn, kocn) !, mask)
 ! Boundary condition along the slope-bottom.
 ! Under-the-ground gridpoints are active only for
 !  "vertical" or "horizontal" sections.
+  write(*,*) "calc_num: boundary conditions:"
   k = 1
   i = iocn(k)
   do while (i <= im)
@@ -628,15 +631,15 @@ subroutine calc_num(num, iocn, kocn) !, mask)
     if (i == iocn(k) .and. k == kocn(i)) then ! next to bottom and wall
       num(i,k) = l
       flag(i,k) = 1
-      write(*,"(1X,A,I4,I4,I6)") "calc_num: diag slope: i k l =", i, k, l
+      write(*,"(4X,A,I4,I4,I6)") "diag slope: i k l =", i, k, l
     else if (i == iocn(k)) then ! vertical
       num(i-1,k) = l
       flag(i-1,k) = 1
-      write(*,"(1X,A,I4,I4,I6)") "calc_num: vert wall : i k l =", i, k, l
+      write(*,"(4X,A,I4,I4,I6)") "vert wall : i k l =", i, k, l
     else if (k == kocn(i)) then ! horizontal
       num(i,k+1) = l
       flag(i,k+1) = 1
-      write(*,"(1X,A,I4,I4,I6)") "calc_num: flat bot  : i k l =", i, k, l
+      write(*,"(4X,A,I4,I4,I6)") "flat bot  : i k l =", i, k, l
     else
       write(ERROR_UNIT,*)&
           "Something is wrong: Point must be adjacent to bndry."
@@ -660,7 +663,7 @@ subroutine calc_num(num, iocn, kocn) !, mask)
     write(ERROR_UNIT,*) 'num: Matrix Size Mismatch! l = ', l, ", N = ", ntot
     error stop 5
   else
-    write(*,"(*(1X,G0))") "Number of eqs. l =", l
+    write(*,"(*(1X,G0))") "calc_num: Number of eqs. l =", l
   end if
 
 ! Verify: num should be defined ( > 0) for all the active gridpoints.
@@ -720,7 +723,12 @@ program main
 !  character(*), parameter:: rightboundary = "P=0"
 !  character(*), parameter:: rightboundary = "wall"
 
-  character(*), parameter:: ofile = "Eigenmodes-z.fort.bin"
+  logical, parameter:: streambin = .true. ! output is stream binary.
+!  logical, parameter:: streambin = .false. ! output is sequential binary.
+  character(*), parameter:: ofile = &
+      merge("Eigenmodes-z.bin     ", "Eigenmodes-z.fort.bin", streambin)
+  character(*), parameter:: ofile_access = &
+      merge("STREAM    ",            "SEQUENTIAL",            streambin)
 
   real(double):: gravit
   real(double):: tmp ! temporary variable
@@ -728,9 +736,9 @@ program main
   integer:: itmp ! temporary variable
   integer:: uni
 
-  write(*,*) "Ver 0.7.1: Eigenvalues will be c ."
+  write(*,*) "main: ver 0.7.1: Eigenvalues will be c ."
 !  write(*,*) "rightboundary = "//trim(rightboundary)
-  write(*,*) "f0 = ", f0
+  write(*,"(1X,G0,1X,ES0.15)") "main: f0 =", f0
 
 ! Grid and Topography
 !   Set within subroutines or read from a file.
@@ -744,24 +752,31 @@ program main
   call calc_ocn(iocn, mask, kocn)
   call calc_num(num, iocn, kocn)
 
-  if (verbose) then
-    write(*,*) "num(0,   0)    = ", num(0,   0)
-    write(*,*) "num(im+1,0)    = ", num(im+1,0)
-    write(*,*) "num(im+1,km+1) = ", num(im+1,km+1)
-    write(*,*) "num(0,   km+1) = ", num(0,   km+1)
+  if (num(0,0) >= 0 .or. num(im+1,0) >= 0 &
+      .or. num(im+1,km+1) >= 0 .or. num(0,km+1) >= 0) then
+    write(ERROR_UNIT, *) "The corner points in num must be undefined."
+    error stop 3
+  else if (verbose) then
+    write(*,*) "main: corner points in num are undefined: "
+    write(*,*) "   num(0,   0)    =", num(0,   0)
+    write(*,*) "   num(im+1,0)    =", num(im+1,0)
+    write(*,*) "   num(im+1,km+1) =", num(im+1,km+1)
+    write(*,*) "   num(0,   km+1) =", num(0,   km+1)
   end if
 
   if (verbose) then
+    write(*,*) "main: vertical grid:"
     do k = 0, km+1
-      write(*,"(1X,A,I4,I12,F21.15)") "k iocn(k) dz(k) =", k, iocn(k), dz(k)
+      write(*,"(4X,A,I4,I12,F21.15)") "k iocn(k) dz(k) =", k, iocn(k), dz(k)
     end do
+    write(*,*) "main: horizontal grid:"
     do i = 0, im+1
-      write(*,"(1X,A,I4,I12,F23.13)") "i kocn(i) dx(i) =", i, kocn(i), dx(i)
+      write(*,"(4X,A,I4,I12,F23.13)") "i kocn(i) dx(i) =", i, kocn(i), dx(i)
     end do
   end if
 
   M = maxval(num) ! max gridpoint number == the number of gridpoints.
-  if (verbose) write(*,"(*(1X,G0))") "im, km, M, im*km - M =",&
+  if (verbose) write(*,"(*(1X,G0))") "main: im, km, M, im*km - M =",&
       im, km, M, im*km - M
 
 !=== Build the A and B matrices ===
@@ -771,15 +786,15 @@ program main
 !   leftward, and rightward neighbors.
   if (freesurface) then
     gravit = gravit_default
-    write(*,"(*(1X,G0))") "free surface: gravit =", gravit
+    write(*,"(*(1X,G0))") "main: free surface: gravit =", gravit
   else
     gravit = ieee_value(1.d0, IEEE_QUIET_NAN)
-    write(*,"(*(1X,G0))") "rigid lid"
+    write(*,"(*(1X,G0))") "main: rigid lid"
   end if
 
   call eqs_all(A, B, l, iocn, kocn, num, dx, dz, N2e, f0, M, gravit=gravit)
   if (l == M) then
-    write(*,"(*(1X,G0))") "l =", l, "equations have been defined."
+    write(*,"(*(1X,G0))") "main: l =", l, "equations have been defined."
   else
     write(ERROR_UNIT,"(*(1X,G0))") "eqs-gridpoints mismatch: l,M =", l, M
     error stop 2
@@ -803,13 +818,13 @@ program main
     if (ltmp) write(*,*) "abs(AF[l]) <", tmp, "for all l"
   end if
   if (verbose) then
-    write(*,*) "BF when F = (1,...,1):"
+    write(*,"(*(1X,G0))") "main: elems of vector BF when F = (1,...,1):"
     tmpVec(:) = 1
     tmpVec = matmul(B,tmpVec)
     itmp = 0
     do i = 1, size(tmpVec)
       if (abs(tmpVec(i)) > 1.d-21) then
-        write(*,"(2X,A,I8,1X,G0)") "B: l (FB)[l] =", i, tmpVec(i)
+        write(*,"(4X,A,I8,2X,G0)") "l (BF)[l] =", i, tmpVec(i)
         itmp = itmp + 1
       end if
     end do
@@ -818,8 +833,8 @@ program main
           "There are", itmp, "nonzero BF values whereas km =", km
       error stop 77
     else
-      write(*,"(1X,*(1X,G0))") &
-          "There are exactly km = ", km, " nonzero vals in BF."
+      write(*,"(3X,*(1X,G0))") &
+          "There are exactly km =", km, "nonzero vals in BF."
     end if
   end if
   deallocate(tmpVec)
@@ -835,16 +850,16 @@ program main
   end if
 
   if (freesurface) then
-    write(*,*) "symmetric definite solver is used."
+    write(*,*) "main: symmetric definite solver is used."
     call solve_sym(VR, alphaR, alphaI, A, B, f0)
   else
-    write(*,*) "genenral solver is used."
+    write(*,*) "main: genenral solver is used."
     call solve_gen(VR, alphaR, alphaI, A, B, f0)
   end if
 
 !---Output the results---
-  open(newunit=uni, file=ofile, form="UNFORMATTED", access="SEQUENTIAL", &
-      status="REPLACE", position="REWIND")
+  open(newunit=uni, file=ofile, access=ofile_access, form="UNFORMATTED"&
+      ,status="REPLACE", position="REWIND")
   write(uni) M, im, km
   write(uni) num
   write(uni) kocn
@@ -859,7 +874,7 @@ program main
   write(uni) real(N2e,    kind=outtype)
   close(uni)
 
-  write(*,"(1X,A)",advance="NO") "Output to "//trim(ofile)
+  write(*,"(1X,A)",advance="NO") "main: output to "//trim(ofile)
   if (outtype == double) then
     write(*,"(A)") " in double precision"
   else if (outtype == single) then
@@ -868,7 +883,7 @@ program main
     write(*,"(A)") " in unkown type"
   end if
 
-  write(*,*) "Program finished successfully."
+  write(*,*) "main: program finished successfully."
 !  stop ! <- Will print an unnecessary message depending on the compiler.
 
 contains
@@ -984,7 +999,7 @@ contains
       M, B, LDB, A, LDA, &
       cee, tmpwork, LWORK, INFO )
     LWORK = ceiling(tmpwork(1)) ! Optimal value.
-    if (verbose) write(*,*) "solve_sym: LWORK =", LWORK
+    if (verbose) write(*,"(*(1X,G0))") "solve_sym: LWORK =", LWORK
 
     ! Actually solve
     allocate(WORK(LWORK))
@@ -1099,7 +1114,7 @@ contains
 
     kocn(:) = - huge(1) ! undef
 
-    write(*,*) "reading grid from "//trim(infile)
+    write(*,*) "read_grid: reading grid from "//trim(infile)
     open(newunit=uni, file=infile, form="FORMATTED", &
         access="SEQUENTIAL", status="OLD", position="REWIND")
 
@@ -1194,8 +1209,8 @@ contains
     close(uni)
     N2e(:) = Ne(:)**2
     deallocate(Ne)
-    write(*,*) "Ne(z) is read from "//trim(infile) &
-        //" and N2e(z) is calculated."
+    write(*,*) "read_N2e: N(z) is read from "//trim(infile) &
+        //" and N^2(z) is calculated."
   end subroutine read_N2e
 
 

@@ -2,7 +2,7 @@
 MAKEFLAGS += --check-symlink-times
 
 # Default target
-all: bin
+default_target = $(main)
 
 # Provide runnam as command line argument as
 #   make bin runnam=<runnam>
@@ -44,9 +44,16 @@ dep_obj	=	ctwmodes_pars.o
 $(main): $(main_src) $(dep_mod) $(dep_obj)
 	$(FC) $(FCFLAGS) -o $@ $(main_src) $(dep_obj)
 
+# Default target
+.DEFAULT_GOAL := $(default_target)
+
 # ===
-.PHONY: clean bin
+.PHONY: clean bin run all
 clean:
 	-rm -f *.o *.mod *.smod
 
-bin: $(main)
+run: bin
+	./$(main)
+
+all: run
+	julia ./fortbin2nc.jl
