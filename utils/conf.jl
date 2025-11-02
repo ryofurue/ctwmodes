@@ -5,14 +5,14 @@
 #                 (Grid.txt, Ne.txt, and ctwmodes_pars.f90).
 # Author:       Ryo Furue <ryofurue@gmail.com>
 # License:      MIT License
-# Version:      v"0.7.1"
+# Version:      v"0.7.2"
 # Created:      2025-??-??
-# Updated:      2025-07-01
+# Updated:      2025-10-09
 # =============================================================================
 """
 """
 
-const SCRIPT_VERSION = v"0.7.1" # `Base.VERSION` is used by the interpreter.
+const SCRIPT_VERSION = v"0.7.2" # `Base.VERSION` is used by the interpreter.
 
 println("CTW configure script, version ", SCRIPT_VERSION)
 
@@ -65,7 +65,7 @@ const nooffs = OffsetArrays.no_offset_view
 
 # Internal use, for testing
 using DataFrames # tabular output for debugging
-using Random  # We generate a ramdom slope.
+using Random  # We generate a ramdom slope for testing.
 using GLMakie # Plot the slope for testing.
 
 #=
@@ -479,6 +479,8 @@ end
 
 """
 Helper function to determine dx in the flat bottom region.
+  xx1 is the left edge of the flat-bottom region.
+  dx1 is the cell width to the left of xx1 .
 """
 function dx_flatbottom(; dx1, xx1, xmax)
   @assert xmax > xx1
@@ -569,6 +571,25 @@ end
 # =============
 """
 Helper:
+Determine dz as dz = amp * (1 + (-z/scale))
+Creates nz levels within -hmax < z < 0.
+Amplitude is ad-hoc.
+"""
+function dz_exponential(; hmax, scale, nz)
+  amp = 5.0
+  dz = Vector{Float64}(undef,nz)
+  z = 0.0
+  for k in 1:nz
+    dz[k] = amp*(1 + (-z/scale))
+    z -= dz[k]
+  end
+  dz .= dz .* (hmax/(-z))
+  @assert sum(dz) ≈ hmax
+  return dz
+end
+
+"""
+Helper:
 Determine dz between z1 and z2 (z1 > z2) such that dz ∝ 1/Nfunc(zz)
   The resultant dz[:]'s exactly split (z1, z2):
     z2 + sum(dz) == z1
@@ -646,18 +667,100 @@ end
 
 
 """
-Example:
+Example: Linear slope after a small vertical wall h0.
+The simplest use is
+```
+  (dx, dz, kocn) = grid_linslope_example()
+```
+In this case, a constant function for N(z) is used.
 """
-function grid_linslope_example()
+function grid_linslope_example(; nfunc = nothing, dz_sample = 100.0, h0=50.0)
   x1   = 100.0e3
   xmax = 300.0e3
-  h0 = 50.0
+  #h0 = 50.0
   hbot = 5000.0
   h_x = (hbot - h0)/x1
-  nf(z) = 0.003
+  nf = isnothing(nfunc) ? (z -> 0.003) : nfunc
   grid_linslope(; z1=-h0, z2=-5000.0
-                ,dz_sample=100.0, h_x=h_x, Nfunc=nf, xmax=xmax)
+                ,dz_sample=dz_sample, h_x=h_x, Nfunc=nf, xmax=xmax)
 end
+
+"""
+Example: Linear continental shelf followed by a steeper continental slope.
+"""
+function grid_linshelfslope_example()
+  shelfwid = 150.0e3
+  slopewid = 100.0e3
+  xmax = shelfwid + slopewid + 200.0e3
+  h0 = 0.0 # the initial vertical wall
+  hsb = 100.0 # depth of the shelf break.
+  hbot = 5000.0
+  h_x_shelf = (hsb  - h0)/shelfwid
+  h_x_slope = (hbot - hsb)/slopewid
+  #dz_shelf = let nz_shelf = 5 # too coarse for the x-wavelength.
+  #  fill(hsb/nz_shelf, nz_shelf) # uniform dz
+  #end
+  dz_shelf = dz_exponential(;hmax=hsb, scale=hsb/3, nz=15) # increasing
+  dx_shelf = dz_shelf ./ h_x_shelf
+  (dx_slope, dz_slope) =
+    dz_dx_linslope(; z1=-hsb, z2=-hbot
+                  ,dz_sample=40.0, h_x=h_x_slope
+                  ,Nfunc=Nfunc)
+  dx = vcat(dx_shelf, dx_slope)
+  dz = vcat(dz_shelf, dz_slope)
+  kocn = 1:length(dz)
+  dx_flat = dx_flatbottom(;dx1 = dx[end], xx1=sum(dx), xmax=xmax)
+  dx = vcat(dx,dx_flat)
+  kocn = vcat(kocn, fill(kocn[end], length(dx_flat)))
+  (dx=dx, dz=dz, kocn=kocn)
+end
+
+
+"""
+Example: Linear continental shelf followed by a vertical wall.
+  The shelf is the same as that of grid_linshelfslope_example().
+"""
+function grid_linshelfwall_example()
+  shelfwid = 150.0e3
+  xmax = shelfwid + 200.0e3
+  h0 = 0.0 # the initial vertical wall
+  hsb = 100.0 # depth of the shelf break.
+  hbot = 5000.0
+  h_x_shelf = (hsb  - h0)/shelfwid
+  #dz_shelf = let nz_shelf = 5 # too coarse for the x-wavelength.
+  #  fill(hsb/nz_shelf, nz_shelf) # uniform dz
+  #end
+  dz_shelf = dz_exponential(;hmax=hsb, scale=hsb/3, nz=15) # increasing
+  dx_shelf = dz_shelf ./ h_x_shelf
+  dz_wall = dz_from_N(; z1=-hsb, z2=-hbot
+                      ,dz_sample=40.0, Nfunc=Nfunc)
+  dx = dx_shelf
+  dz = vcat(dz_shelf, dz_wall)
+  kocn = 1:length(dz_shelf)
+  dx_flat = dx_flatbottom(;dx1 = 800.0, xx1=sum(dx), xmax=xmax)
+  dx = vcat(dx,dx_flat)
+  kocn = vcat(kocn, fill(length(dz), length(dx_flat)))
+  (dx=dx, dz=dz, kocn=kocn)
+end
+
+
+"""
+Example: a pure vertical wall.
+  Mimicks the wall part of grid_linshelfwall_example()
+  as much as possible.  dz_sample was determined so that
+  kmax = 51.
+"""
+function grid_wall_example()
+  xmax = 200.0e3
+  hbot = 5000.0
+  dz_wall = dz_from_N(; z1=0.0, z2=-hbot
+                      ,dz_sample=38.0, Nfunc=Nfunc)
+  dx_flat = dx_flatbottom(;dx1 = 800.0, xx1=0.0, xmax=xmax)
+  kmax = length(dz_wall)
+  kocn = fill(kmax, length(dx_flat))
+  (dx=dx_flat, dz=dz_wall, kocn=kocn)
+end
+
 
 
 """
@@ -940,12 +1043,12 @@ end
 # I use N_southAus2 and f0
 #   from SeaParams.jl but that's not necessary.
 # You can just write down your own N(z) funciton here.
-# You can just set your own f0 here.
+# You can just set your own f0 here, too.
 push!(LOAD_PATH, pwd())
 #using SeaParams: N_southAus2, totdep, f0
 using SeaParams: SeaParams
-# Nfunc = SeaParams.N_southAus2 # function N(z)
-Nfunc = SeaParams.N_const2 # function N(z)
+Nfunc = SeaParams.N_southAus2 # function N(z)
+#Nfunc = SeaParams.N_const2 # function N(z) == const.
 
 #=
 """
@@ -1002,6 +1105,14 @@ end
 @assert wid_slope ≈ sum(dx[1:(km-1)])
 =#
 
+"""
+An example of "main program".
+Although Julia doesn't require any "main" program,
+we organize multiple possiblities into multiple "main" programs
+so that we can switch between the possibilities easily.
+This main program builds a simplest configuration:
+in the absense of config files, it uses an example grid with Nfunc(z).
+"""
 function main()
 # Testing: Internally produce ad-hoc topography.
 #  (; dx, dz, kocn) = slope_for_testing()
@@ -1035,4 +1146,85 @@ function main()
   end
 end
 
-main()
+"""
+Another example of main program.
+It assumes a linear slope, determines dz on the basis of Nfunc,
+and then determines dx by dx = dz/h_x, assuming a linear slope.
+"""
+function main2()
+  isfile(conf_topo_file) && println(stderr, "$(conf_topo_file) is ignored.")
+  isfile(conf_Ne_file)   && println(stderr, "$(conf_Ne_file) is ignored.")
+
+  (; dx, dz, kocn) = grid_linslope_example(; nfunc = Nfunc
+                                           , dz_sample=38.5, h0=38.5)
+
+  write_grid(grid_file; dx, dz, kocn)
+
+  # Generate N(z) and write the Ne_file:
+  zzax = calc_zzax(dz)
+  Ne = grid_Nfunc(Nfunc; zzax)
+  write_Ne(Ne_file; Ne, zzax)
+
+  # Write par_file.
+  let im = length(dx), km = length(dz)
+    write_fort_pars(par_file; im, km, SeaParams.f0, grid_file, Ne_file)
+  end
+end
+
+"""
+Another example of main program.
+There is a continental shelf followed by the slope.
+"""
+function main3()
+  isfile(conf_topo_file) && println(stderr, "$(conf_topo_file) is ignored.")
+  isfile(conf_Ne_file)   && println(stderr, "$(conf_Ne_file) is ignored.")
+
+  #println("shelf+slope")
+  #(; dx, dz, kocn) = grid_linshelfslope_example()
+  println("shelf+vert.wall")
+  (; dx, dz, kocn) = grid_linshelfwall_example()
+
+  write_grid(grid_file; dx, dz, kocn)
+
+  # Generate N(z) and write the Ne_file:
+  zzax = calc_zzax(dz)
+  Ne = grid_Nfunc(Nfunc; zzax)
+  write_Ne(Ne_file; Ne, zzax)
+
+  # Write par_file.
+  let im = length(dx), km = length(dz)
+    write_fort_pars(par_file; im, km, SeaParams.f0, grid_file, Ne_file)
+  end
+end
+
+
+"""
+Another example of main program.
+A pure vertical wall.
+"""
+function main4()
+  isfile(conf_topo_file) && println(stderr, "$(conf_topo_file) is ignored.")
+  isfile(conf_Ne_file)   && println(stderr, "$(conf_Ne_file) is ignored.")
+
+  println("vert.wall")
+  (; dx, dz, kocn) = grid_wall_example()
+
+  write_grid(grid_file; dx, dz, kocn)
+
+  # Generate N(z) and write the Ne_file:
+  zzax = calc_zzax(dz)
+  Ne = grid_Nfunc(Nfunc; zzax)
+  write_Ne(Ne_file; Ne, zzax)
+
+  # Write par_file.
+  let im = length(dx), km = length(dz)
+    write_fort_pars(par_file; im, km, SeaParams.f0, grid_file, Ne_file)
+  end
+end
+
+
+# --- run main ---
+#main()
+#main2()
+main3()
+#main4()

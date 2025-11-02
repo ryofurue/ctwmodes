@@ -5,11 +5,13 @@
 #                 to a netCDF file.
 # Author:       Ryo Furue <ryofurue@gmail.com>
 # License:      MIT License
-# Version:      v"0.7"
+# Version:      v"0.7.1-noargs"
 # Created:      2025-??-??
-# Updated:      2025-09-04
+# Updated:      2025-10-10
 # =============================================================================
-const SCRIPT_VERSION = v"0.7" # `Base.VERSION` is used by the interpreter.
+# `Base.VERSION` is used by the interpreter.
+const SCRIPT_VERSION = v"0.7.1-noargs" # pre-release of 0.7.1 .
+
 
 println("CTW data conversion script, version ", SCRIPT_VERSION)
 
@@ -41,7 +43,7 @@ const ouf_def = "$(filestem).nc"
 # --- Determine input and output files ---
 #  This section is a bit complicated to provide
 #  multiple ways of specifying input or output filenames.
-using ArgMacros
+#using ArgMacros
 using Match
 
 function myerror(exitcode,mes)
@@ -49,9 +51,12 @@ function myerror(exitcode,mes)
   exit(exitcode)
 end
 
-const usage =
-  "fortbin2nc [-i infile] [-o outfile] [infile [outfile]]"
+# Primary usage:
+#  fortbin2nc [-i infile] [-o outfile] [infile [outfile]]
+# A few other options are also available.
 
+#= Arguments are disabled because ArgMacros.jl has gotten broken
+     with Julia 1.12.0.
 #We used to have '--double' or '-d' ... both input and output are double precition.
 args = @tuplearguments begin
   @helpusage """
@@ -75,6 +80,14 @@ args = @tuplearguments begin
   @positionaloptional String par1
   @positionaloptional String par2
 end
+=#
+
+# Instread of parsing command-line arguments, simulate the situation
+# that no arguments are given.
+(! isempty(ARGS)) && println(stderr, "Arguments are currently ignored.")
+const args = (; inf1 = nothing, ouf1 = nothing
+              , par1 = nothing, par2 = nothing
+              , title = nothing)
 
 
 """
@@ -185,9 +198,15 @@ cee = cee_west
 
 prij = map_to_xz(; pr=pr, nidx=nidx, num=num, outtype=outtype)
 
-# normalization is optional
-for m in axes(prij,3)
-  normalize!(view(prij,:,:,m); mes = "mode $(m): ")
+modeax = axes(prij,3)
+
+normfac = fill(NaN, modeax) # can be an OffsetArray
+# normalization factor
+let km = length(dz) - 2
+  for m in modeax
+    #  normalize!(view(prij,:,:,m); mes = "mode $(m): ")
+    normfac[m] = normfactor(view(prij,:,:,m); iocn, kocn, dz, kmax=km)
+  end
 end
 
 
@@ -217,7 +236,9 @@ save_modes(ouf; prij=prij, cee=cee
            ,xax=xax, zax=zax, dx=dx, dz=dz, f0=f0, bvf2e=bvf2e
            ,kocn=kocn, iocn=iocn
            ,outtype=outtype
-           ,title=args.title)
+           ,title=args.title
+           ,normfactor=normfac
+           )
 
 modeax = axes(prij,3)
 #@show typeof(modeax)
@@ -239,7 +260,9 @@ ouf_finer = stem * "-finer" * ".nc"
 save_modes(ouf_finer; prij=prij2, cee=cee
            ,xax=xx, zax=zz, f0=f0
            ,outtype=outtype
-           ,title=args.title)
+           ,title=args.title
+           ,normfactor=normfac
+           )
 
 #-- This section is optional: Examine the unphysical modes --
 found = false

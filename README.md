@@ -1,8 +1,15 @@
-# ???? Under construction ????
 # Numerical calculation of coastal trapped wave modes
 
 Provides a program to calculate baroclinic coastal trapped (CTW) wave modes
 in the low-frequency limit (ω ≪ f).
+Currently, we are writing a paper to fully describe our numerical method.
+We will update this document when we have made the paper public.
+<!--
+See [Furue & Tanaka (2025)?????](???? No URL yet ?????)
+for a full description and discussion
+of our numerical method.
+-->
+
 
 <!-- These links are invisible in the rendered version. -->
 [progs]: progs
@@ -53,9 +60,6 @@ using the sigma coordinates
 ([Tanaka 2023](https://doi.org/10.1175/JPO-D-22-0201.1))
 and modified it to use the z coordinates.
 The latter version has evolved into the program we provide here.
-
-See [Furue & Tanaka (2025)?????](???? No URL yet ?????) for a full description and discussion
-of our numerical method.
 
 
 ## 2. Getting Started
