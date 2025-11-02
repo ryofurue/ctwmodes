@@ -1,5 +1,12 @@
 # Numerical calculation of coastal trapped wave modes
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17507173.svg)](https://doi.org/10.5281/zenodo.17507173)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/ryofurue/ctwmodes/blob/main/LICENSE)
+<!--
+[![Build Status](https://github.com/ryofurue/ctwmodes/actions/workflows/ci.yml/badge.svg)](https://github.com/ryofurue/ctwmodes/actions)
+-->
+
+
 Provides a program to calculate baroclinic coastal trapped (CTW) wave modes
 in the low-frequency limit (ω ≪ f).
 Currently, we are writing a paper to fully describe our numerical method.
