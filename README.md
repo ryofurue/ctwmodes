@@ -1,6 +1,6 @@
 # Numerical calculation of coastal trapped wave modes
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17507173.svg)](https://doi.org/10.5281/zenodo.17507173)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.17507173-blue)](https://doi.org/10.5281/zenodo.17507173)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/ryofurue/ctwmodes/blob/main/LICENSE)
 <!--
 [![Build Status](https://github.com/ryofurue/ctwmodes/actions/workflows/ci.yml/badge.svg)](https://github.com/ryofurue/ctwmodes/actions)
