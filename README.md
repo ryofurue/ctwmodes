@@ -307,8 +307,15 @@ $ julia thescript.jl
 ## 4. Project information
 
 ### Authors
-* [Ryo Furue \<ryofurue@gmail.com\>](mailto:ryofurue@gmail.com)
+* Ryo Furue
+[<ryofurue@gmail.com>](mailto:ryofurue@gmail.com)
+[![ORCiD](https://img.shields.io/badge/ORCID-0000--0003--0563--1189-A6CE39)](https://orcid.org/0000-0003-0563-1189)
 * Yuki Tanaka
+
+<!--
+[![email](https://img.shields.io/badge/email-ryofurue%40gmail.com-blue)](mailto:ryofurue@gmail.com)
+-->
+
 
 ### Version History
 
