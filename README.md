@@ -713,8 +713,8 @@ That process resulted in `ctwmodes-006c.f90`, which handled only logistics,
 plus the external module for the new scheme.
 
 After comparing this with results from the Brink & Champan code,
-we decided the new scheme is much better and there is no point in providing
-the original scheme.
+we decided the new scheme (ver.007) is much better then 006b
+and there is no point in providing the original scheme.
 
 When we created version 007 to be published as 0.7.0, we included the
 module in the source file of `ctwmodes.f90`
