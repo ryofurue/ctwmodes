@@ -83,7 +83,7 @@ Notes
 
 * On Mac, `LAPACK` comes with the operating system and
   can be used by `gfortran` without any special configuration.
-  (See the `progs/Makefile`.)
+  (See `progs/Makefile`.)
 * On Mac or Linux, `juliaup` installs the Julia environment
   under the user's home directory. No superuser privilege is needed.
 
@@ -214,7 +214,7 @@ If the corresponding data file does not exist,
 Currently, `conf.jl` uses functions defined in
 `SeaParams.jl`.
 So, you can add your function to this module
-edit `conf.jl` to use it.
+and edit `conf.jl` to use it.
 But `SeaParams.jl` isn't an essential part of
 the tools at all.
 You can directly define your function in `conf.jl`.
@@ -339,8 +339,12 @@ Inspiration, code snippets, etc.
 
 ### References
 * Tanaka Y. 2023. Energy conversion rate from subinertial surface tides to internal tides. *J. of Phys. Oceanogr.* 53 (5): 1355–1374.
-[https://doi.org/10.1175/JPO-D-22-0201.1](https://doi.org/10.1175/JPO-D-22-0201.1) .
-* Furue R. & Tanaka Y. 2025. ???????????????????
+<https://doi.org/10.1175/JPO-D-22-0201.1> .
+* Furue R. & Tanaka Y. 2025. *Preprint.*
+ Numerical calculation of coastal trapped wave modes.
+ *EarthArXiv.*
+ <https://doi.org/10.31223/X5VJ2F>
+  (or <https://eartharxiv.org/repository/view/10924/>).
 
 ---
 ## Appendix A: Parameter file formats
