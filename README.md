@@ -67,6 +67,9 @@ using the sigma coordinates
 ([Tanaka 2023](https://doi.org/10.1175/JPO-D-22-0201.1))
 and modified it to use the z coordinates.
 The latter version has evolved into the program we provide here.
+A complete description our code is
+[Furue \& Tanaka (2025)](https://doi.org/10.31223/X5VJ2F).
+
 
 
 ## 2. Getting Started
